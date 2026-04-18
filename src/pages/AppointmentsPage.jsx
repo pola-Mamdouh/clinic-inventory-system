@@ -6,13 +6,16 @@ import Modal from '../components/ui/Modal';
 import SearchBar from '../components/ui/SearchBar';
 import Badge from '../components/ui/Badge';
 import EmptyState from '../components/ui/EmptyState';
+import ComboBox from '../components/ui/ComboBox';
 import { getAppointments, addAppointment, updateAppointment, deleteAppointment } from '../firebase/appointments';
 import { getPatients } from '../firebase/patients';
+import { getDoctors } from '../firebase/users';
 import { useAuth } from '../context/AuthContext';
 
 const EMPTY_FORM = {
-  patientId: '', patientName: '', doctorName: '', date: '',
-  time: '', reason: '', status: 'scheduled', priority: 'normal'
+  patientId: '', patientName: '',
+  doctorId: '', doctorName: '',
+  date: '', time: '', reason: '', status: 'scheduled', priority: 'normal',
 };
 
 const STATUS_MAP = {
@@ -25,20 +28,26 @@ const STATUS_MAP = {
 export default function AppointmentsPage() {
   const { role } = useAuth();
   const [appointments, setAppointments] = useState([]);
-  const [patients, setPatients] = useState([]);
-  const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
+  const [patients, setPatients]         = useState([]);
+  const [doctors, setDoctors]           = useState([]);
+  const [search, setSearch]             = useState('');
+  const [loading, setLoading]           = useState(true);
+  const [modalOpen, setModalOpen]       = useState(false);
+  const [editing, setEditing]           = useState(null);
+  const [form, setForm]                 = useState(EMPTY_FORM);
+  const [saving, setSaving]             = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
 
   const load = async () => {
     try {
-      const [appts, pts] = await Promise.all([getAppointments(), getPatients()]);
+      const [appts, pts, drs] = await Promise.all([
+        getAppointments(),
+        getPatients(),
+        getDoctors(),
+      ]);
       setAppointments(appts);
       setPatients(pts);
+      setDoctors(drs);
     } catch {
       toast.error('Failed to load appointments');
     } finally {
@@ -49,12 +58,21 @@ export default function AppointmentsPage() {
   useEffect(() => { load(); }, []);
 
   const openNew = () => { setEditing(null); setForm(EMPTY_FORM); setModalOpen(true); };
-  const openEdit = (a) => { setEditing(a); setForm({ ...a }); setModalOpen(true); };
+  const openEdit = (a) => {
+    setEditing(a);
+    // Try to resolve doctorId from existing doctorName for backwards-compat
+    const matchedDoctor = doctors.find(
+      d => (d.name && d.name === a.doctorName) || d.email === a.doctorName
+    );
+    setForm({ ...a, doctorId: matchedDoctor?.id || '' });
+    setModalOpen(true);
+  };
   const closeModal = () => { setModalOpen(false); setEditing(null); };
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!form.patientName || !form.date || !form.time) { toast.error('Patient, date, and time are required'); return; }
+    if (!form.patientId) { toast.error('Please select a patient'); return; }
+    if (!form.date || !form.time) { toast.error('Date and time are required'); return; }
     setSaving(true);
     try {
       if (editing) { await updateAppointment(editing.id, form); toast.success('Appointment updated'); }
@@ -229,25 +247,77 @@ export default function AppointmentsPage() {
       {/* Modal */}
       <Modal open={modalOpen} onClose={closeModal} title={editing ? 'Edit Appointment' : 'Book Appointment'} size="md">
         <form onSubmit={handleSave} className="space-y-4">
+
+          {/* ── Patient — searchable combobox ─────────────────────────────── */}
           <div>
-            <label className="block text-xs text-slate-400 mb-1.5 uppercase tracking-wider font-medium">Patient *</label>
-            <select
+            <label className="block text-xs text-slate-400 mb-1.5 uppercase tracking-wider font-medium">
+              Patient <span className="text-red-400">*</span>
+            </label>
+            <ComboBox
               value={form.patientId}
-              onChange={e => {
-                const p = patients.find(x => x.id === e.target.value);
-                setForm({ ...form, patientId: e.target.value, patientName: p ? `${p.firstName} ${p.lastName}` : '' });
+              onChange={(id, item) =>
+                setForm({
+                  ...form,
+                  patientId: id,
+                  patientName: item ? `${item.firstName} ${item.lastName}` : '',
+                })
+              }
+              options={patients.map(p => ({
+                ...p,
+                _subtext: [p.phone, p.email].filter(Boolean).join(' · '),
+              }))}
+              displayValue={p => `${p.firstName} ${p.lastName}`}
+              filterOption={(p, q) => {
+                const lq = q.toLowerCase();
+                return (
+                  `${p.firstName} ${p.lastName}`.toLowerCase().includes(lq) ||
+                  (p.phone  && p.phone.toLowerCase().includes(lq))  ||
+                  (p.email  && p.email.toLowerCase().includes(lq))
+                );
               }}
-              className="w-full bg-navy-800 border border-white/10 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-500/50 transition-all"
-            >
-              <option value="">Select patient...</option>
-              {patients.map(p => <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>)}
-            </select>
+              icon={User}
+              placeholder="Search by name or phone…"
+              emptyMessage="No patients found"
+            />
           </div>
 
+          {/* ── Doctor — dynamic selection from registered doctors ────────── */}
+          <div>
+            <label className="block text-xs text-slate-400 mb-1.5 uppercase tracking-wider font-medium">
+              Doctor
+            </label>
+            <ComboBox
+              value={form.doctorId}
+              onChange={(id, item) =>
+                setForm({
+                  ...form,
+                  doctorId: id,
+                  // Store the human-readable name so existing list views still work
+                  doctorName: item ? (item.name || item.email) : '',
+                })
+              }
+              options={doctors.map(d => ({
+                ...d,
+                _subtext: d.name ? d.email : undefined,
+              }))}
+              displayValue={d => d.name || d.email}
+              filterOption={(d, q) => {
+                const lq = q.toLowerCase();
+                return (
+                  (d.name  && d.name.toLowerCase().includes(lq))  ||
+                  (d.email && d.email.toLowerCase().includes(lq))
+                );
+              }}
+              icon={Stethoscope}
+              placeholder="Select a doctor…"
+              emptyMessage={doctors.length === 0 ? 'No doctors in the system yet' : 'No doctors found'}
+            />
+          </div>
+
+          {/* ── Date, Time, Reason ────────────────────────────────────────── */}
           {[
-            { label: 'Doctor Name', key: 'doctorName', type: 'text', placeholder: 'Dr. Smith' },
-            { label: 'Date *', key: 'date', type: 'date' },
-            { label: 'Time *', key: 'time', type: 'time' },
+            { label: 'Date *',           key: 'date',   type: 'date' },
+            { label: 'Time *',           key: 'time',   type: 'time' },
             { label: 'Reason for Visit', key: 'reason', type: 'text', placeholder: 'e.g. Annual checkup' },
           ].map(({ label, key, type, placeholder }) => (
             <div key={key}>

@@ -37,12 +37,12 @@ const INVENTORY = [
   { name: 'Alcohol Swabs',        category: 'Consumable', unit: 'boxes',   quantity: 200, lowStockThreshold: 30, price: 1.20,  supplier: 'MedSupply Co.',    notes: '70% isopropyl' },
 ];
 
-// uid → role mapping for the three demo accounts
-// Must match the UIDs of users you created in Firebase Auth
+// uid → role mapping for the three demo accounts.
+// `name` is stored in Firestore so the Doctor combobox shows a real name.
 const USER_ROLES = [
-  { email: 'receptionist@clinic.com', role: 'receptionist' },
-  { email: 'doctor@clinic.com',       role: 'doctor' },
-  { email: 'inventory@clinic.com',    role: 'inventory' },
+  { email: 'receptionist@clinic.com', role: 'receptionist', name: 'Sara (Receptionist)' },
+  { email: 'doctor@clinic.com',       role: 'doctor',       name: 'Dr. Ahmed'           },
+  { email: 'inventory@clinic.com',    role: 'inventory',    name: 'Inventory Manager'   },
 ];
 
 export const seedDatabase = async (onProgress) => {
@@ -78,10 +78,10 @@ export const seedDatabase = async (onProgress) => {
   return results;
 };
 
-// Called after login — reads the UID from Firebase Auth and writes the role to Firestore
+// Called after login — writes role (and name) to Firestore users collection
 export const seedUserRoles = async (currentUser) => {
   const match = USER_ROLES.find(u => u.email === currentUser.email);
   if (match) {
-    await createUserProfile(currentUser.uid, currentUser.email, match.role);
+    await createUserProfile(currentUser.uid, currentUser.email, match.role, match.name);
   }
 };
