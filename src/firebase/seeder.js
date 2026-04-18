@@ -37,9 +37,12 @@ const INVENTORY = [
   { name: 'Alcohol Swabs',        category: 'Consumable', unit: 'boxes',   quantity: 200, lowStockThreshold: 30, price: 1.20,  supplier: 'MedSupply Co.',    notes: '70% isopropyl' },
 ];
 
-// uid → role mapping for the three demo accounts.
-// `name` is stored in Firestore so the Doctor combobox shows a real name.
+// uid → role mapping for demo accounts.
+// `name` is stored in Firestore so comboboxes show real names.
+// NOTE: admin@clinic.com must be created manually in Firebase Auth Console
+//       (same as the other demo accounts) with password: clinic123
 const USER_ROLES = [
+  { email: 'admin@clinic.com',        role: 'admin',        name: 'System Admin'        },
   { email: 'receptionist@clinic.com', role: 'receptionist', name: 'Sara (Receptionist)' },
   { email: 'doctor@clinic.com',       role: 'doctor',       name: 'Dr. Ahmed'           },
   { email: 'inventory@clinic.com',    role: 'inventory',    name: 'Inventory Manager'   },

@@ -11,12 +11,18 @@ export const getUserRole = async (uid) => {
 
 /**
  * Write (or merge) a user profile into Firestore.
- * `name` is optional — used for display in the Doctor combobox.
+ * `name` and `specialty` are optional.
  */
-export const createUserProfile = async (uid, email, role, name) => {
+export const createUserProfile = async (uid, email, role, name, specialty) => {
   await setDoc(
     doc(db, 'users', uid),
-    { email, role, ...(name ? { name } : {}), createdAt: serverTimestamp() },
+    {
+      email,
+      role,
+      ...(name      ? { name }      : {}),
+      ...(specialty ? { specialty } : {}),
+      createdAt: serverTimestamp(),
+    },
     { merge: true }
   );
 };

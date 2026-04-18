@@ -6,9 +6,10 @@ import toast from 'react-hot-toast';
 import { seedUserRoles } from '../../firebase/seeder';
 
 const DEMO_ACCOUNTS = [
-  { label: 'Receptionist', email: 'receptionist@clinic.com', color: 'from-violet-500 to-purple-600', icon: '🗂️' },
-  { label: 'Doctor', email: 'doctor@clinic.com', color: 'from-teal-500 to-cyan-600', icon: '👨‍⚕️' },
-  { label: 'Inventory', email: 'inventory@clinic.com', color: 'from-amber-500 to-orange-600', icon: '📦' },
+  { label: 'Admin',        email: 'admin@clinic.com',        icon: '⚙️'  },
+  { label: 'Receptionist', email: 'receptionist@clinic.com', icon: '🗂️' },
+  { label: 'Doctor',       email: 'doctor@clinic.com',       icon: '👨‍⚕️' },
+  { label: 'Inventory',    email: 'inventory@clinic.com',    icon: '📦' },
 ];
 
 export default function LoginPage() {
@@ -123,7 +124,7 @@ export default function LoginPage() {
               <ShieldCheck className="w-3.5 h-3.5 text-slate-500" />
               <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Demo Accounts</p>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {DEMO_ACCOUNTS.map(acc => (
                 <button
                   key={acc.email}

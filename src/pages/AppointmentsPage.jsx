@@ -7,7 +7,7 @@ import SearchBar from '../components/ui/SearchBar';
 import Badge from '../components/ui/Badge';
 import EmptyState from '../components/ui/EmptyState';
 import ComboBox from '../components/ui/ComboBox';
-import { getAppointments, addAppointment, updateAppointment, deleteAppointment } from '../firebase/appointments';
+import { getAppointments, getDoctorAppointments, addAppointment, updateAppointment, deleteAppointment } from '../firebase/appointments';
 import { getPatients } from '../firebase/patients';
 import { getDoctors } from '../firebase/users';
 import { useAuth } from '../context/AuthContext';
@@ -26,7 +26,7 @@ const STATUS_MAP = {
 };
 
 export default function AppointmentsPage() {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const [appointments, setAppointments] = useState([]);
   const [patients, setPatients]         = useState([]);
   const [doctors, setDoctors]           = useState([]);
@@ -40,8 +40,14 @@ export default function AppointmentsPage() {
 
   const load = async () => {
     try {
+      // Doctors see only their own appointments (WHERE doctorId == uid).
+      // Receptionist and admin see all appointments.
+      const appointmentFetch = role === 'doctor'
+        ? getDoctorAppointments(user.uid)
+        : getAppointments();
+
       const [appts, pts, drs] = await Promise.all([
-        getAppointments(),
+        appointmentFetch,
         getPatients(),
         getDoctors(),
       ]);
@@ -127,7 +133,7 @@ export default function AppointmentsPage() {
               ))}
             </div>
           </div>
-          {role === 'receptionist' && (
+          {(role === 'receptionist' || role === 'admin') && (
             <button
               onClick={openNew}
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-400 hover:to-cyan-500 text-white text-sm font-semibold rounded-xl transition-all shadow-glow-teal"
@@ -169,7 +175,15 @@ export default function AppointmentsPage() {
             <div className="w-8 h-8 border-2 border-teal-500/30 border-t-teal-500 rounded-full animate-spin" />
           </div>
         ) : filtered.length === 0 ? (
-          <EmptyState icon={Calendar} title="No appointments found" description="Book a new appointment to get started." />
+          <EmptyState
+            icon={Calendar}
+            title="No appointments found"
+            description={
+              role === 'doctor'
+                ? "No appointments are assigned to your account yet. Ask the receptionist to book appointments for you."
+                : "Book a new appointment to get started."
+            }
+          />
         ) : (
           <div className="bg-navy-900 border border-white/5 rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
@@ -223,7 +237,7 @@ export default function AppointmentsPage() {
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-2">
-                          {role === 'receptionist' && (
+                          {(role === 'receptionist' || role === 'admin') && (
                             <>
                               <button onClick={() => openEdit(a)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-teal-500/20 hover:text-teal-400 text-slate-400 transition-all">
                                 <Pencil className="w-3.5 h-3.5" />

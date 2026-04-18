@@ -2,20 +2,32 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   Stethoscope, LayoutDashboard, Users, Calendar,
-  Package, ClipboardList, LogOut, ChevronRight, Database
+  Package, ClipboardList, LogOut, ChevronRight, Database, UserCog,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const ROLE_CONFIG = {
+  admin: {
+    label: 'Admin',
+    color: 'from-rose-500 to-pink-600',
+    badge: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+    nav: [
+      { to: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard'      },
+      { to: '/admin',        icon: UserCog,         label: 'Manage Doctors' },
+      { to: '/patients',     icon: Users,           label: 'Patients'       },
+      { to: '/appointments', icon: Calendar,        label: 'Appointments'   },
+      { to: '/setup',        icon: Database,        label: 'Seed Database'  },
+    ],
+  },
   receptionist: {
     label: 'Receptionist',
     color: 'from-violet-500 to-purple-600',
     badge: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
     nav: [
-      { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-      { to: '/patients', icon: Users, label: 'Patients' },
-      { to: '/appointments', icon: Calendar, label: 'Appointments' },
-      { to: '/setup', icon: Database, label: 'Seed Database' },
+      { to: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard'    },
+      { to: '/patients',     icon: Users,           label: 'Patients'     },
+      { to: '/appointments', icon: Calendar,        label: 'Appointments' },
+      { to: '/setup',        icon: Database,        label: 'Seed Database'},
     ],
   },
   doctor: {
@@ -23,9 +35,9 @@ const ROLE_CONFIG = {
     color: 'from-teal-500 to-cyan-600',
     badge: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
     nav: [
-      { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-      { to: '/appointments', icon: ClipboardList, label: 'My Appointments' },
-      { to: '/setup', icon: Database, label: 'Seed Database' },
+      { to: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard'       },
+      { to: '/appointments', icon: ClipboardList,   label: 'My Appointments' },
+      { to: '/setup',        icon: Database,        label: 'Seed Database'   },
     ],
   },
   inventory: {
@@ -33,9 +45,9 @@ const ROLE_CONFIG = {
     color: 'from-amber-500 to-orange-600',
     badge: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
     nav: [
-      { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-      { to: '/inventory', icon: Package, label: 'Inventory' },
-      { to: '/setup', icon: Database, label: 'Seed Database' },
+      { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard'    },
+      { to: '/inventory', icon: Package,         label: 'Inventory'    },
+      { to: '/setup',     icon: Database,        label: 'Seed Database'},
     ],
   },
 };

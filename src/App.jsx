@@ -8,6 +8,7 @@ import PatientsPage from './pages/PatientsPage';
 import AppointmentsPage from './pages/AppointmentsPage';
 import InventoryPage from './pages/InventoryPage';
 import SetupPage from './pages/SetupPage';
+import AdminPage from './pages/AdminPage';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -35,17 +36,31 @@ function AppRoutes() {
 
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/dashboard" element={<DashboardPage />} />
+
+        {/* Admin-only: doctor management */}
+        <Route path="/admin" element={
+          <RoleRoute roles={['admin']}>
+            <AdminPage />
+          </RoleRoute>
+        } />
+
+        {/* Patients: admin + receptionist + doctor */}
         <Route path="/patients" element={
-          <RoleRoute roles={['receptionist', 'doctor']}>
+          <RoleRoute roles={['admin', 'receptionist', 'doctor']}>
             <PatientsPage />
           </RoleRoute>
         } />
+
+        {/* Appointments: all roles (doctor gets filtered view) */}
         <Route path="/appointments" element={<AppointmentsPage />} />
+
+        {/* Inventory: admin + inventory + doctor */}
         <Route path="/inventory" element={
-          <RoleRoute roles={['inventory', 'doctor']}>
+          <RoleRoute roles={['admin', 'inventory', 'doctor']}>
             <InventoryPage />
           </RoleRoute>
         } />
+
         <Route path="/setup" element={<SetupPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
