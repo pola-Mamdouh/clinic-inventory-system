@@ -6,12 +6,12 @@ import Badge from '../components/ui/Badge';
 import ExaminationModal from '../components/examination/ExaminationModal';
 import { useAuth } from '../context/AuthContext';
 import { getPatients } from '../firebase/patients';
-import { getAppointments } from '../firebase/appointments';
+import { getAppointments, getDoctorAppointments } from '../firebase/appointments';
 import { getInventory } from '../firebase/inventory';
 import toast from 'react-hot-toast';
 
 export default function DashboardPage() {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const [stats, setStats] = useState({ patients: 0, appointments: 0, inventory: 0, lowStock: 0 });
   const [todayAppts, setTodayAppts] = useState([]);
   const [lowStockItems, setLowStockItems] = useState([]);
@@ -24,13 +24,22 @@ export default function DashboardPage() {
 
   const load = async () => {
     try {
-      const [patients, appts, inv] = await Promise.all([getPatients(), getAppointments(), getInventory()]);
+      // Doctors should only see their own appointments — never all patients' data
+      const appointmentFetch = role === 'doctor'
+        ? getDoctorAppointments(user.uid)
+        : getAppointments();
+
+      const [patients, appts, inv] = await Promise.all([
+        getPatients(), appointmentFetch, getInventory(),
+      ]);
+
       const todayList = appts.filter(a => a.date === today && a.status !== 'cancelled');
-      const lowStock = inv.filter(i => i.quantity <= (i.lowStockThreshold || 5));
+      const lowStock  = inv.filter(i => i.quantity <= (i.lowStockThreshold || 5));
 
       setStats({
         patients: patients.length,
-        appointments: appts.filter(a => a.status === 'scheduled' || a.status === 'in-progress').length,
+        // Count only today's active appointments so the stat matches the "Today's Appointments" panel
+        appointments: appts.filter(a => a.date === today && (a.status === 'scheduled' || a.status === 'in-progress')).length,
         inventory: inv.length,
         lowStock: lowStock.length,
       });
@@ -44,7 +53,10 @@ export default function DashboardPage() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  // Re-run load when role or uid changes (role is resolved asynchronously after mount)
+  useEffect(() => {
+    if (role) load();
+  }, [role, user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openExamination = (appt) => { setSelectedAppt(appt); setExamModal(true); };
 
@@ -62,6 +74,7 @@ export default function DashboardPage() {
   }
 
   const SUBTITLE_MAP = {
+    admin: 'System overview',
     receptionist: 'Front desk overview',
     doctor: 'Clinical overview',
     inventory: 'Stock management overview',
@@ -75,7 +88,7 @@ export default function DashboardPage() {
         {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard title="Total Patients" value={stats.patients} icon={Users} color="teal" trend={12} trendLabel="vs last month" delay={0} />
-          <StatCard title="Active Appointments" value={stats.appointments} icon={Calendar} color="cyan" trend={5} trendLabel="scheduled today" delay={100} />
+          <StatCard title="Today's Active" value={stats.appointments} icon={Calendar} color="cyan" trendLabel="scheduled today" delay={100} />
           <StatCard title="Inventory Items" value={stats.inventory} icon={Package} color="violet" delay={200} />
           <StatCard title="Low Stock Alerts" value={stats.lowStock} icon={AlertTriangle} color={stats.lowStock > 0 ? 'red' : 'emerald'} delay={300} />
         </div>
@@ -114,7 +127,8 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant={STATUS_MAP[a.status] || 'default'} dot>{a.status}</Badge>
-                      {role === 'doctor' && a.status === 'scheduled' && (
+                      {/* Show Examine button for both scheduled and in-progress appointments */}
+                      {role === 'doctor' && (a.status === 'scheduled' || a.status === 'in-progress') && (
                         <button
                           onClick={() => openExamination(a)}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-500/20 hover:bg-teal-500/30 text-teal-400 text-xs font-semibold rounded-lg transition-all border border-teal-500/20"
@@ -133,7 +147,7 @@ export default function DashboardPage() {
           {/* Right column */}
           <div className="space-y-4">
             {/* Low Stock Alerts */}
-            {(role === 'inventory' || role === 'doctor') && (
+            {(role === 'inventory' || role === 'doctor' || role === 'admin') && (
               <div className="bg-navy-900 border border-white/5 rounded-2xl overflow-hidden animate-slide-up" style={{ animationDelay: '150ms' }}>
                 <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
                   <div className="flex items-center gap-2">

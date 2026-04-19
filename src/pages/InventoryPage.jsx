@@ -8,6 +8,7 @@ import Badge from '../components/ui/Badge';
 import EmptyState from '../components/ui/EmptyState';
 import StatCard from '../components/ui/StatCard';
 import { getInventory, addInventoryItem, updateInventoryItem, deleteInventoryItem } from '../firebase/inventory';
+import { useAuth } from '../context/AuthContext';
 
 const CATEGORIES = ['Medicine', 'Surgical', 'Diagnostic', 'Consumable', 'Equipment', 'Other'];
 const UNITS = ['pcs', 'boxes', 'bottles', 'vials', 'packs', 'rolls', 'pairs', 'units'];
@@ -18,6 +19,8 @@ const EMPTY_FORM = {
 };
 
 export default function InventoryPage() {
+  const { role } = useAuth();
+  const canMutate = role === 'admin' || role === 'inventory';
   const [items, setItems] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -41,15 +44,19 @@ export default function InventoryPage() {
 
   const openNew = () => { setEditing(null); setForm(EMPTY_FORM); setModalOpen(true); };
   const openEdit = (item) => { setEditing(item); setForm({ ...item, quantity: String(item.quantity), lowStockThreshold: String(item.lowStockThreshold || 5), price: String(item.price || '') }); setModalOpen(true); };
-  const closeModal = () => { setModalOpen(false); setEditing(null); };
+  // Always reset form on close — prevents stale data appearing in the next "Add Item" modal
+  const closeModal = () => { setModalOpen(false); setEditing(null); setForm(EMPTY_FORM); };
 
   const handleSave = async (e) => {
     e.preventDefault();
     if (!form.name) { toast.error('Name is required'); return; }
     setSaving(true);
     try {
+      // Strip id and createdAt before writing — sending them back would overwrite
+      // createdAt with a client-side value on update.
+      const { id: _id, createdAt: _createdAt, ...formData } = form;
       const payload = {
-        ...form,
+        ...formData,
         quantity: Number(form.quantity) || 0,
         lowStockThreshold: Number(form.lowStockThreshold) || 5,
         price: Number(form.price) || 0,
@@ -89,7 +96,7 @@ export default function InventoryPage() {
   const totalItems = items.length;
   const lowStockCount = items.filter(i => i.quantity <= (i.lowStockThreshold || 5)).length;
   const outOfStock = items.filter(i => i.quantity === 0).length;
-  const totalValue = items.reduce((s, i) => s + (i.price || 0) * (i.quantity || 0), 0);
+  const totalValue = items.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 0), 0);
 
   const SortIcon = ({ col }) => (
     <span className={`ml-1 inline-flex flex-col ${sortBy === col ? 'text-teal-400' : 'text-slate-700'}`}>
@@ -119,7 +126,7 @@ export default function InventoryPage() {
           <StatCard title="Total Items" value={totalItems} icon={Package} color="teal" delay={0} />
           <StatCard title="Low Stock" value={lowStockCount} icon={AlertTriangle} color={lowStockCount > 0 ? 'amber' : 'emerald'} delay={100} />
           <StatCard title="Out of Stock" value={outOfStock} icon={TrendingDown} color={outOfStock > 0 ? 'red' : 'emerald'} delay={200} />
-          <StatCard title="Total Value" value={`$${totalValue.toLocaleString()}`} icon={Package} color="violet" delay={300} />
+          <StatCard title="Total Value" value={`$${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={Package} color="violet" delay={300} />
         </div>
 
         {/* Low stock banner */}
@@ -153,13 +160,16 @@ export default function InventoryPage() {
               ))}
             </div>
           </div>
-          <button
-            onClick={openNew}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-400 hover:to-cyan-500 text-white text-sm font-semibold rounded-xl transition-all shadow-glow-teal"
-          >
-            <Plus className="w-4 h-4" />
-            Add Item
-          </button>
+          {/* Doctors can view inventory but not modify it */}
+          {canMutate && (
+            <button
+              onClick={openNew}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-400 hover:to-cyan-500 text-white text-sm font-semibold rounded-xl transition-all shadow-glow-teal"
+            >
+              <Plus className="w-4 h-4" />
+              Add Item
+            </button>
+          )}
         </div>
 
         {/* Table */}
@@ -253,14 +263,16 @@ export default function InventoryPage() {
                           <Badge variant={stockBadge(item)} dot>{stockLabel(item)}</Badge>
                         </td>
                         <td className="px-5 py-4">
-                          <div className="flex items-center gap-2">
-                            <button onClick={() => openEdit(item)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-teal-500/20 hover:text-teal-400 text-slate-400 transition-all">
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => handleDelete(item.id)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-red-500/20 hover:text-red-400 text-slate-400 transition-all">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
+                          {canMutate && (
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => openEdit(item)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-teal-500/20 hover:text-teal-400 text-slate-400 transition-all">
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button onClick={() => handleDelete(item.id)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-red-500/20 hover:text-red-400 text-slate-400 transition-all">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );

@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 import { db } from './config';
 import { createUserProfile } from './users';
 
@@ -15,13 +15,14 @@ const PATIENTS = [
   { firstName: 'Nour',    lastName: 'Al-Rashid',email: 'nour@email.com',   phone: '555-0105', gender: 'Female', bloodType: 'O-',  dateOfBirth: '1995-01-14', notes: 'Asthma' },
 ];
 
-const today = new Date().toISOString().split('T')[0];
+// NOTE: today is now computed inside seedDatabase so it's evaluated at seed-run
+// time, not at module-import time (which could be the previous day at midnight).
 const APPOINTMENTS = [
-  { patientName: 'Sara Johnson',   doctorName: 'Dr. Ahmed',   date: today,        time: '09:00', reason: 'Annual checkup',       status: 'scheduled',   priority: 'normal' },
-  { patientName: 'Ahmed Hassan',   doctorName: 'Dr. Ahmed',   date: today,        time: '10:30', reason: 'Diabetes follow-up',    status: 'scheduled',   priority: 'urgent' },
-  { patientName: 'Lina Morales',   doctorName: 'Dr. Sarah',   date: today,        time: '11:00', reason: 'Allergy consultation',  status: 'in-progress', priority: 'normal' },
-  { patientName: 'James Carter',   doctorName: 'Dr. Sarah',   date: '2026-04-20', time: '14:00', reason: 'Blood pressure review', status: 'scheduled',   priority: 'normal' },
-  { patientName: 'Nour Al-Rashid', doctorName: 'Dr. Ahmed',   date: '2026-04-21', time: '09:30', reason: 'Asthma management',     status: 'scheduled',   priority: 'urgent' },
+  { patientName: 'Sara Johnson',   doctorName: 'Dr. Ahmed', date: 'TODAY_PLACEHOLDER', time: '09:00', reason: 'Annual checkup',       status: 'scheduled',   priority: 'normal' },
+  { patientName: 'Ahmed Hassan',   doctorName: 'Dr. Ahmed', date: 'TODAY_PLACEHOLDER', time: '10:30', reason: 'Diabetes follow-up',    status: 'scheduled',   priority: 'urgent' },
+  { patientName: 'Lina Morales',   doctorName: 'Dr. Ahmed', date: 'TODAY_PLACEHOLDER', time: '11:00', reason: 'Allergy consultation',  status: 'in-progress', priority: 'normal' },
+  { patientName: 'James Carter',   doctorName: 'Dr. Ahmed', date: 'TODAY_PLACEHOLDER', time: '14:00', reason: 'Blood pressure review', status: 'scheduled',   priority: 'normal' },
+  { patientName: 'Nour Al-Rashid', doctorName: 'Dr. Ahmed', date: 'TODAY_PLACEHOLDER', time: '09:30', reason: 'Asthma management',     status: 'scheduled',   priority: 'urgent' },
 ];
 
 const INVENTORY = [
@@ -49,6 +50,8 @@ const USER_ROLES = [
 ];
 
 export const seedDatabase = async (onProgress) => {
+  // Compute today at execution time, not module-load time
+  const today = new Date().toISOString().split('T')[0];
   const results = { patients: 0, appointments: 0, inventory: 0, skipped: [] };
 
   // Patients
@@ -60,11 +63,31 @@ export const seedDatabase = async (onProgress) => {
     }
   } else { results.skipped.push('patients'); }
 
-  // Appointments
+  // Appointments — try to resolve doctorId from existing user profiles so that
+  // the doctor's filtered appointment view works correctly after seeding.
   onProgress('Seeding appointments...');
   if (await isEmpty('appointments')) {
+    // Build name → uid map from registered doctor profiles
+    let doctorMap = {};
+    try {
+      const doctorSnap = await getDocs(
+        query(collection(db, 'users'), where('role', '==', 'doctor'))
+      );
+      doctorSnap.forEach(d => {
+        const name = d.data().name;
+        if (name) doctorMap[name] = d.id;
+      });
+    } catch { /* non-fatal: appointments will have empty doctorId */ }
+
     for (const a of APPOINTMENTS) {
-      await addDoc(collection(db, 'appointments'), { ...a, createdAt: serverTimestamp() });
+      await addDoc(collection(db, 'appointments'), {
+        ...a,
+        // Replace relative 'today' placeholder with the actual date
+        date: a.date === 'TODAY_PLACEHOLDER' ? today : a.date,
+        // Attach doctorId so getDoctorAppointments() can filter by UID
+        doctorId: doctorMap[a.doctorName] || '',
+        createdAt: serverTimestamp(),
+      });
       results.appointments++;
     }
   } else { results.skipped.push('appointments'); }

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Pencil, Trash2, Phone, Mail, Calendar, UserCircle } from 'lucide-react';
+import { Users, Plus, Pencil, Trash2, Phone, Mail, History, UserCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Header from '../components/layout/Header';
 import Modal from '../components/ui/Modal';
 import SearchBar from '../components/ui/SearchBar';
 import Badge from '../components/ui/Badge';
 import EmptyState from '../components/ui/EmptyState';
+import PatientHistoryModal from '../components/patients/PatientHistoryModal';
 import { getPatients, addPatient, updatePatient, deletePatient } from '../firebase/patients';
 
 const EMPTY_FORM = {
@@ -21,6 +22,7 @@ export default function PatientsPage() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [historyPatient, setHistoryPatient] = useState(null);
 
   const load = async () => {
     try {
@@ -37,7 +39,8 @@ export default function PatientsPage() {
 
   const openNew = () => { setEditing(null); setForm(EMPTY_FORM); setModalOpen(true); };
   const openEdit = (p) => { setEditing(p); setForm({ ...p }); setModalOpen(true); };
-  const closeModal = () => { setModalOpen(false); setEditing(null); };
+  // Always reset form on close — prevents stale data appearing in the next "New Patient" modal
+  const closeModal = () => { setModalOpen(false); setEditing(null); setForm(EMPTY_FORM); };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -45,7 +48,10 @@ export default function PatientsPage() {
     setSaving(true);
     try {
       if (editing) {
-        await updatePatient(editing.id, form);
+        // Strip non-data fields (id, createdAt) — sending them back would overwrite createdAt
+        // with a client-side value and is generally unsafe.
+        const { id: _id, createdAt: _createdAt, ...updateData } = form;
+        await updatePatient(editing.id, updateData);
         toast.success('Patient updated');
       } else {
         await addPatient(form);
@@ -125,7 +131,7 @@ export default function PatientsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-white/5">
-                    {['Patient', 'Contact', 'Gender', 'Blood Type', 'Actions'].map(h => (
+                    {['Patient', 'Contact', 'Gender', 'Blood Type', 'Actions'].map((h) => (
                       <th key={h} className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                         {h}
                       </th>
@@ -158,6 +164,13 @@ export default function PatientsPage() {
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setHistoryPatient(p)}
+                            title="Medical History"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-violet-500/20 hover:text-violet-400 text-slate-400 transition-all"
+                          >
+                            <History className="w-3.5 h-3.5" />
+                          </button>
                           <button onClick={() => openEdit(p)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-teal-500/20 hover:text-teal-400 text-slate-400 transition-all">
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
@@ -175,7 +188,14 @@ export default function PatientsPage() {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Medical history viewer */}
+      <PatientHistoryModal
+        open={!!historyPatient}
+        onClose={() => setHistoryPatient(null)}
+        patient={historyPatient}
+      />
+
+      {/* Add / edit modal */}
       <Modal open={modalOpen} onClose={closeModal} title={editing ? 'Edit Patient' : 'Register Patient'} size="lg">
         <form onSubmit={handleSave} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">

@@ -42,9 +42,20 @@ export default function ComboBox({
 
   const selectedItem = options.find(o => o.id === value) ?? null;
 
+  // filterOption is optional — default to matching the displayValue string
+  const defaultFilter = (o, q) =>
+    displayValue(o).toLowerCase().includes(q.toLowerCase());
+
   const filtered = query.trim()
-    ? options.filter(o => filterOption(o, query.trim()))
+    ? options.filter(o =>
+        filterOption ? filterOption(o, query.trim()) : defaultFilter(o, query.trim())
+      )
     : options;
+
+  // Clamp highlighted index so it never exceeds the filtered list size.
+  // This prevents Enter selecting undefined when the options array shrinks
+  // while a ComboBox is open (e.g., a concurrent Firestore update).
+  const safeHighlighted = Math.min(highlighted, Math.max(0, filtered.length - 1));
 
   // ── Compute fixed position (bypasses any overflow:hidden parents) ──────────
   const computePos = useCallback(() => {
@@ -116,7 +127,7 @@ export default function ComboBox({
         break;
       case 'Enter':
         e.preventDefault();
-        if (filtered[highlighted]) select(filtered[highlighted]);
+        if (filtered[safeHighlighted]) select(filtered[safeHighlighted]);
         break;
       case 'Escape':
       case 'Tab':
@@ -129,8 +140,8 @@ export default function ComboBox({
   // ── Scroll highlighted item into view ────────────────────────────────────────
   useEffect(() => {
     if (!listRef.current) return;
-    listRef.current.children[highlighted]?.scrollIntoView({ block: 'nearest' });
-  }, [highlighted]);
+    listRef.current.children[safeHighlighted]?.scrollIntoView({ block: 'nearest' });
+  }, [safeHighlighted]);
 
   // ── Portal dropdown ──────────────────────────────────────────────────────────
   const dropdown = open
@@ -153,7 +164,7 @@ export default function ComboBox({
                   onMouseDown={(e) => { e.preventDefault(); select(item); }}
                   onMouseEnter={() => setHighlighted(i)}
                   className={`flex items-center gap-3 px-3.5 py-2.5 cursor-pointer transition-colors ${
-                    i === highlighted
+                    i === safeHighlighted
                       ? 'bg-teal-500/15 text-white'
                       : 'text-slate-300 hover:bg-white/5 hover:text-white'
                   }`}

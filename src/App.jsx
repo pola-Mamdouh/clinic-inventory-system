@@ -23,7 +23,16 @@ function ProtectedRoute({ children }) {
 }
 
 function RoleRoute({ roles, children }) {
-  const { role } = useAuth();
+  const { role, loading } = useAuth();
+  // Wait for auth to finish resolving — without this guard, RoleRoute redirects
+  // to /dashboard while role is still null (before getUserRole resolves).
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-navy-950 flex items-center justify-center">
+        <div className="w-10 h-10 border-2 border-teal-500/30 border-t-teal-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
   return roles.includes(role) ? children : <Navigate to="/dashboard" replace />;
 }
 
@@ -61,7 +70,12 @@ function AppRoutes() {
           </RoleRoute>
         } />
 
-        <Route path="/setup" element={<SetupPage />} />
+        {/* Setup / seed: admin only */}
+        <Route path="/setup" element={
+          <RoleRoute roles={['admin']}>
+            <SetupPage />
+          </RoleRoute>
+        } />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
 

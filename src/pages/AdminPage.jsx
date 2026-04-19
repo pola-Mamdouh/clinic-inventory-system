@@ -85,8 +85,8 @@ export default function AdminPage() {
 
     setSaving(true);
     try {
-      const doc = await createDoctor({ name: name.trim(), email: email.trim(), password, specialty });
-      toast.success(`Dr. ${doc.name} registered successfully`);
+      const newDoctor = await createDoctor({ name: name.trim(), email: email.trim(), password, specialty });
+      toast.success(`Dr. ${newDoctor.name} registered successfully`);
       closeModal();
       await load();
     } catch (err) {
@@ -97,12 +97,14 @@ export default function AdminPage() {
   };
 
   const handleDelete = async (doctor) => {
-    if (!confirm(`Remove Dr. ${doctor.name}'s access?\n\nThis will delete their profile from the system. They will no longer be able to log in.`)) return;
+    if (!confirm(`Remove Dr. ${doctor.name}'s access?\n\nThis will delete their profile from the system. Their current session may remain active for up to 1 hour.`)) return;
     setDeletingId(doctor.id);
     try {
       await removeDoctorProfile(doctor.id);
       toast.success(`${doctor.name} removed`);
-      setDoctors(d => d.filter(x => x.id !== doctor.id));
+      // Reload from Firestore to confirm the true state rather than optimistic filtering,
+      // which would leave the UI inconsistent if the delete partially failed.
+      await load();
     } catch {
       toast.error('Failed to remove doctor');
     } finally {

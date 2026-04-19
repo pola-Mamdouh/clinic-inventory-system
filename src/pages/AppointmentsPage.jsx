@@ -61,19 +61,24 @@ export default function AppointmentsPage() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  // Re-run when role/uid resolves — role arrives asynchronously from AuthContext,
+  // so an empty-deps array would call load() with role=null on the first render.
+  useEffect(() => {
+    if (role) load();
+  }, [role, user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openNew = () => { setEditing(null); setForm(EMPTY_FORM); setModalOpen(true); };
   const openEdit = (a) => {
     setEditing(a);
-    // Try to resolve doctorId from existing doctorName for backwards-compat
-    const matchedDoctor = doctors.find(
-      d => (d.name && d.name === a.doctorName) || d.email === a.doctorName
-    );
-    setForm({ ...a, doctorId: matchedDoctor?.id || '' });
+    // Prefer stored doctorId; fall back to name-matching for legacy appointments
+    // that were created before doctorId was tracked.
+    const resolvedDoctorId = a.doctorId ||
+      doctors.find(d => d.name === a.doctorName || d.email === a.doctorName)?.id || '';
+    setForm({ ...EMPTY_FORM, ...a, doctorId: resolvedDoctorId });
     setModalOpen(true);
   };
-  const closeModal = () => { setModalOpen(false); setEditing(null); };
+  // Always reset form on close — prevents stale data appearing in the next "New" modal
+  const closeModal = () => { setModalOpen(false); setEditing(null); setForm(EMPTY_FORM); };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -220,7 +225,9 @@ export default function AppointmentsPage() {
                         <p className="text-sm text-slate-300 max-w-[160px] truncate">{a.reason || '—'}</p>
                       </td>
                       <td className="px-5 py-4">
-                        {role === 'doctor' ? (
+                        {role === 'doctor' && a.status !== 'completed' && a.status !== 'cancelled' ? (
+                          // Only allow forward transitions: scheduled → in-progress → completed/cancelled
+                          // Completed/cancelled appointments show a read-only badge
                           <select
                             value={a.status}
                             onChange={e => handleStatusChange(a.id, e.target.value)}

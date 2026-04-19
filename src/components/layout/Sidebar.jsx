@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   Stethoscope, LayoutDashboard, Users, Calendar,
@@ -16,6 +16,7 @@ const ROLE_CONFIG = {
       { to: '/admin',        icon: UserCog,         label: 'Manage Doctors' },
       { to: '/patients',     icon: Users,           label: 'Patients'       },
       { to: '/appointments', icon: Calendar,        label: 'Appointments'   },
+      { to: '/inventory',    icon: Package,         label: 'Inventory'      },
       { to: '/setup',        icon: Database,        label: 'Seed Database'  },
     ],
   },
@@ -27,7 +28,6 @@ const ROLE_CONFIG = {
       { to: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard'    },
       { to: '/patients',     icon: Users,           label: 'Patients'     },
       { to: '/appointments', icon: Calendar,        label: 'Appointments' },
-      { to: '/setup',        icon: Database,        label: 'Seed Database'},
     ],
   },
   doctor: {
@@ -37,7 +37,7 @@ const ROLE_CONFIG = {
     nav: [
       { to: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard'       },
       { to: '/appointments', icon: ClipboardList,   label: 'My Appointments' },
-      { to: '/setup',        icon: Database,        label: 'Seed Database'   },
+      { to: '/inventory',    icon: Package,         label: 'Inventory'       },
     ],
   },
   inventory: {
@@ -45,22 +45,26 @@ const ROLE_CONFIG = {
     color: 'from-amber-500 to-orange-600',
     badge: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
     nav: [
-      { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard'    },
-      { to: '/inventory', icon: Package,         label: 'Inventory'    },
-      { to: '/setup',     icon: Database,        label: 'Seed Database'},
+      { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+      { to: '/inventory', icon: Package,         label: 'Inventory' },
     ],
   },
 };
 
 export default function Sidebar({ collapsed, setCollapsed }) {
   const { user, role, logout } = useAuth();
-  const navigate = useNavigate();
   const config = ROLE_CONFIG[role] || ROLE_CONFIG.doctor;
 
   const handleLogout = async () => {
-    await logout();
-    toast.success('Logged out successfully');
-    navigate('/login');
+    try {
+      await logout();
+      toast.success('Logged out successfully');
+      // Do NOT call navigate('/login') here — it creates a race condition with
+      // onAuthStateChanged. ProtectedRoute will redirect automatically once
+      // user becomes null.
+    } catch {
+      toast.error('Logout failed');
+    }
   };
 
   return (

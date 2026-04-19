@@ -26,13 +26,22 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const cred = await login(email, password);
-      // Write role to Firestore users collection on every login
-      await seedUserRoles(cred.user);
+      // Navigate immediately — don't let a Firestore seed failure block navigation.
       navigate('/dashboard');
+      // Sync role profile in the background; non-fatal if it fails.
+      seedUserRoles(cred.user).catch(err =>
+        console.warn('Role profile sync failed (non-fatal):', err)
+      );
     } catch (err) {
-      toast.error(err.message.includes('invalid-credential')
-        ? 'Invalid email or password'
-        : 'Login failed. Check your credentials.');
+      // Check err.code (Firebase standard), not err.message (fragile string matching)
+      const code = err.code || '';
+      toast.error(
+        code === 'auth/invalid-credential' ||
+        code === 'auth/wrong-password' ||
+        code === 'auth/user-not-found'
+          ? 'Invalid email or password'
+          : 'Login failed. Check your credentials.'
+      );
     } finally {
       setLoading(false);
     }

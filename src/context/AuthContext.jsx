@@ -13,14 +13,22 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const userRole = await getUserRole(firebaseUser.uid);
-        setUser(firebaseUser);
-        setRole(userRole || 'doctor');
+        try {
+          const userRole = await getUserRole(firebaseUser.uid);
+          setUser(firebaseUser);
+          // Default to 'doctor' (most restrictive clinical role) if no Firestore profile exists
+          setRole(userRole || 'doctor');
+        } catch {
+          setUser(firebaseUser);
+          setRole('doctor');
+        } finally {
+          setLoading(false);
+        }
       } else {
         setUser(null);
         setRole(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
     return unsub;
   }, []);
