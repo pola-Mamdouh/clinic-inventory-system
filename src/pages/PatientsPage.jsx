@@ -13,10 +13,15 @@ import { useFormValidation } from '../hooks/useFormValidation';
 import { required, email as emailRule, egyptianPhone, inputCls } from '../utils/validators';
 
 const PATIENT_SCHEMA = {
-  firstName: [required('First name is required')],
-  lastName:  [required('Last name is required')],
-  email:     [emailRule()],
-  phone:     [egyptianPhone()],
+  firstName:   [required('First name is required')],
+  lastName:    [required('Last name is required')],
+  email:       [required('Email is required'), emailRule()],
+  phone:       [required('Phone number is required'), egyptianPhone()],
+  dateOfBirth: [required('Date of birth is required')],
+  address:     [required('Address is required')],
+  gender:      [required('Please select a gender')],
+  bloodType:   [required('Please select a blood type')],
+  // notes is intentionally omitted — optional field
 };
 
 const EMPTY_FORM = {
@@ -213,11 +218,11 @@ export default function PatientsPage() {
           <div className="grid grid-cols-2 gap-4">
             {[
               { label: 'First Name *', key: 'firstName', type: 'text' },
-              { label: 'Last Name *', key: 'lastName', type: 'text' },
-              { label: 'Email', key: 'email', type: 'email' },
-              { label: 'Phone', key: 'phone', type: 'tel', placeholder: '01XXXXXXXXX' },
-              { label: 'Date of Birth', key: 'dateOfBirth', type: 'date' },
-              { label: 'Address', key: 'address', type: 'text' },
+              { label: 'Last Name *',  key: 'lastName',  type: 'text' },
+              { label: 'Email *',      key: 'email',     type: 'email' },
+              { label: 'Phone *',      key: 'phone',     type: 'tel',  placeholder: '01XXXXXXXXX' },
+              { label: 'Date of Birth *', key: 'dateOfBirth', type: 'date' },
+              { label: 'Address *',    key: 'address',   type: 'text' },
             ].map(({ label, key, type, placeholder }) => (
               <div key={key}>
                 <label className="block text-xs text-slate-400 mb-1.5 uppercase tracking-wider font-medium">{label}</label>
@@ -247,28 +252,30 @@ export default function PatientsPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs text-slate-400 mb-1.5 uppercase tracking-wider font-medium">Gender</label>
+              <label className="block text-xs text-slate-400 mb-1.5 uppercase tracking-wider font-medium">Gender *</label>
               <select
                 value={form.gender}
-                onChange={e => setForm({ ...form, gender: e.target.value })}
-                className="w-full bg-navy-800 border border-white/10 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-500/50 transition-all"
+                onChange={e => { setForm({ ...form, gender: e.target.value }); if (submitted) validateField('gender', e.target.value); }}
+                className={inputCls(!!errors.gender)}
               >
                 <option value="">Select...</option>
                 <option>Male</option>
                 <option>Female</option>
                 <option>Other</option>
               </select>
+              <FieldError message={errors.gender} />
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1.5 uppercase tracking-wider font-medium">Blood Type</label>
+              <label className="block text-xs text-slate-400 mb-1.5 uppercase tracking-wider font-medium">Blood Type *</label>
               <select
                 value={form.bloodType}
-                onChange={e => setForm({ ...form, bloodType: e.target.value })}
-                className="w-full bg-navy-800 border border-white/10 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-500/50 transition-all"
+                onChange={e => { setForm({ ...form, bloodType: e.target.value }); if (submitted) validateField('bloodType', e.target.value); }}
+                className={inputCls(!!errors.bloodType)}
               >
                 <option value="">Select...</option>
                 {['A+','A-','B+','B-','O+','O-','AB+','AB-'].map(b => <option key={b}>{b}</option>)}
               </select>
+              <FieldError message={errors.bloodType} />
             </div>
           </div>
 

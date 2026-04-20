@@ -17,8 +17,10 @@ import { required, inputCls } from '../utils/validators';
 
 const APPT_SCHEMA = {
   patientId: [required('Please select a patient')],
+  doctorId:  [required('Please select a doctor')],
   date:      [required('Date is required')],
   time:      [required('Time is required')],
+  // reason is intentionally omitted — optional field
 };
 
 const EMPTY_FORM = {
@@ -320,18 +322,19 @@ export default function AppointmentsPage() {
           {/* ── Doctor — dynamic selection from registered doctors ────────── */}
           <div>
             <label className="block text-xs text-slate-400 mb-1.5 uppercase tracking-wider font-medium">
-              Doctor
+              Doctor <span className="text-red-400">*</span>
             </label>
             <ComboBox
               value={form.doctorId}
-              onChange={(id, item) =>
+              onChange={(id, item) => {
                 setForm({
                   ...form,
                   doctorId: id,
                   // Store the human-readable name so existing list views still work
                   doctorName: item ? (item.name || item.email) : '',
-                })
-              }
+                });
+                if (submitted) validateField('doctorId', id);
+              }}
               options={doctors.map(d => ({
                 ...d,
                 _subtext: d.name ? d.email : undefined,
@@ -347,7 +350,9 @@ export default function AppointmentsPage() {
               icon={Stethoscope}
               placeholder="Select a doctor…"
               emptyMessage={doctors.length === 0 ? 'No doctors in the system yet' : 'No doctors found'}
+              hasError={!!errors.doctorId}
             />
+            <FieldError message={errors.doctorId} />
           </div>
 
           {/* ── Date, Time, Reason ────────────────────────────────────────── */}
