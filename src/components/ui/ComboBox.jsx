@@ -30,6 +30,7 @@ export default function ComboBox({
   icon: Icon,
   emptyMessage = 'No results found',
   disabled = false,
+  hasError = false,
 }) {
   const [open, setOpen]            = useState(false);
   const [query, setQuery]          = useState('');
@@ -207,7 +208,9 @@ export default function ComboBox({
           cursor-pointer select-none transition-all
           ${open
             ? 'border-teal-500/50 ring-1 ring-teal-500/20'
-            : 'border-white/10 hover:border-white/20'
+            : hasError
+              ? 'border-red-500/50 hover:border-red-500/60'
+              : 'border-white/10 hover:border-white/20'
           }
           ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
         `}

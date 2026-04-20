@@ -5,9 +5,11 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Modal from '../ui/Modal';
+import FieldError from '../ui/FieldError';
 import { getInventory, consumeInventoryItems } from '../../firebase/inventory';
 import { addExamination, getPatientExaminations } from '../../firebase/examinations';
 import { updateAppointment } from '../../firebase/appointments';
+import { inputCls } from '../../utils/validators';
 
 export default function ExaminationModal({ open, onClose, appointment, onComplete }) {
   const [inventory, setInventory]     = useState([]);
@@ -19,6 +21,7 @@ export default function ExaminationModal({ open, onClose, appointment, onComplet
   const [submitting, setSubmitting]   = useState(false);
   const [step, setStep]               = useState('form'); // 'form' | 'success'
   const [supplySearch, setSupplySearch] = useState('');
+  const [diagnosisError, setDiagnosisError] = useState('');
 
   // Previous visits state
   const [history, setHistory]         = useState([]);
@@ -34,6 +37,7 @@ export default function ExaminationModal({ open, onClose, appointment, onComplet
       setNotes('');
       setStep('form');
       setSupplySearch('');
+      setDiagnosisError('');
       setHistory([]);
       setHistoryOpen(false);
       getInventory()
@@ -80,7 +84,11 @@ export default function ExaminationModal({ open, onClose, appointment, onComplet
   };
 
   const handleSubmit = async () => {
-    if (!diagnosis.trim()) { toast.error('Please enter a diagnosis'); return; }
+    if (!diagnosis.trim()) {
+      setDiagnosisError('Diagnosis is required');
+      return;
+    }
+    setDiagnosisError('');
     if (appointment?.status === 'completed') {
       toast.error('This appointment has already been completed');
       return;
@@ -253,11 +261,12 @@ export default function ExaminationModal({ open, onClose, appointment, onComplet
               <label className="block text-xs text-slate-400 mb-1.5 uppercase tracking-wider font-medium">Diagnosis *</label>
               <textarea
                 value={diagnosis}
-                onChange={e => setDiagnosis(e.target.value)}
+                onChange={e => { setDiagnosis(e.target.value); if (e.target.value.trim()) setDiagnosisError(''); }}
                 rows={2}
                 placeholder="Enter diagnosis..."
-                className="w-full bg-navy-800 border border-white/10 text-white placeholder-slate-600 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-500/50 resize-none transition-all"
+                className={`${inputCls(!!diagnosisError)} resize-none`}
               />
+              <FieldError message={diagnosisError} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1.5 uppercase tracking-wider font-medium">Prescription</label>

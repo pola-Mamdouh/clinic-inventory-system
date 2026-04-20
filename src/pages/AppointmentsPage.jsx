@@ -7,10 +7,19 @@ import SearchBar from '../components/ui/SearchBar';
 import Badge from '../components/ui/Badge';
 import EmptyState from '../components/ui/EmptyState';
 import ComboBox from '../components/ui/ComboBox';
+import FieldError from '../components/ui/FieldError';
 import { getAppointments, getDoctorAppointments, addAppointment, updateAppointment, deleteAppointment } from '../firebase/appointments';
 import { getPatients } from '../firebase/patients';
 import { getDoctors } from '../firebase/users';
 import { useAuth } from '../context/AuthContext';
+import { useFormValidation } from '../hooks/useFormValidation';
+import { required, inputCls } from '../utils/validators';
+
+const APPT_SCHEMA = {
+  patientId: [required('Please select a patient')],
+  date:      [required('Date is required')],
+  time:      [required('Time is required')],
+};
 
 const EMPTY_FORM = {
   patientId: '', patientName: '',
@@ -37,6 +46,8 @@ export default function AppointmentsPage() {
   const [form, setForm]                 = useState(EMPTY_FORM);
   const [saving, setSaving]             = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
+
+  const { errors, submitted, validateField, validateAll, resetValidation } = useFormValidation(APPT_SCHEMA);
 
   const load = async () => {
     try {
@@ -67,7 +78,7 @@ export default function AppointmentsPage() {
     if (role) load();
   }, [role, user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const openNew = () => { setEditing(null); setForm(EMPTY_FORM); setModalOpen(true); };
+  const openNew = () => { setEditing(null); setForm(EMPTY_FORM); resetValidation(); setModalOpen(true); };
   const openEdit = (a) => {
     setEditing(a);
     // Prefer stored doctorId; fall back to name-matching for legacy appointments
@@ -75,15 +86,15 @@ export default function AppointmentsPage() {
     const resolvedDoctorId = a.doctorId ||
       doctors.find(d => d.name === a.doctorName || d.email === a.doctorName)?.id || '';
     setForm({ ...EMPTY_FORM, ...a, doctorId: resolvedDoctorId });
+    resetValidation();
     setModalOpen(true);
   };
   // Always reset form on close — prevents stale data appearing in the next "New" modal
-  const closeModal = () => { setModalOpen(false); setEditing(null); setForm(EMPTY_FORM); };
+  const closeModal = () => { setModalOpen(false); setEditing(null); setForm(EMPTY_FORM); resetValidation(); };
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!form.patientId) { toast.error('Please select a patient'); return; }
-    if (!form.date || !form.time) { toast.error('Date and time are required'); return; }
+    if (!validateAll(form)) return;
     setSaving(true);
     try {
       if (editing) { await updateAppointment(editing.id, form); toast.success('Appointment updated'); }
@@ -276,13 +287,15 @@ export default function AppointmentsPage() {
             </label>
             <ComboBox
               value={form.patientId}
-              onChange={(id, item) =>
-                setForm({
+              onChange={(id, item) => {
+                const newForm = {
                   ...form,
                   patientId: id,
                   patientName: item ? `${item.firstName} ${item.lastName}` : '',
-                })
-              }
+                };
+                setForm(newForm);
+                if (submitted) validateField('patientId', id);
+              }}
               options={patients.map(p => ({
                 ...p,
                 _subtext: [p.phone, p.email].filter(Boolean).join(' · '),
@@ -299,7 +312,9 @@ export default function AppointmentsPage() {
               icon={User}
               placeholder="Search by name or phone…"
               emptyMessage="No patients found"
+              hasError={!!errors.patientId}
             />
+            <FieldError message={errors.patientId} />
           </div>
 
           {/* ── Doctor — dynamic selection from registered doctors ────────── */}
@@ -346,10 +361,14 @@ export default function AppointmentsPage() {
               <input
                 type={type}
                 value={form[key]}
-                onChange={e => setForm({ ...form, [key]: e.target.value })}
+                onChange={e => {
+                  setForm({ ...form, [key]: e.target.value });
+                  if (submitted && APPT_SCHEMA[key]) validateField(key, e.target.value);
+                }}
                 placeholder={placeholder}
-                className="w-full bg-navy-800 border border-white/10 text-white placeholder-slate-600 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-500/50 transition-all"
+                className={inputCls(!!errors[key])}
               />
+              <FieldError message={errors[key]} />
             </div>
           ))}
 

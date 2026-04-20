@@ -7,7 +7,17 @@ import SearchBar from '../components/ui/SearchBar';
 import Badge from '../components/ui/Badge';
 import EmptyState from '../components/ui/EmptyState';
 import PatientHistoryModal from '../components/patients/PatientHistoryModal';
+import FieldError from '../components/ui/FieldError';
 import { getPatients, addPatient, updatePatient, deletePatient } from '../firebase/patients';
+import { useFormValidation } from '../hooks/useFormValidation';
+import { required, email as emailRule, egyptianPhone, inputCls } from '../utils/validators';
+
+const PATIENT_SCHEMA = {
+  firstName: [required('First name is required')],
+  lastName:  [required('Last name is required')],
+  email:     [emailRule()],
+  phone:     [egyptianPhone()],
+};
 
 const EMPTY_FORM = {
   firstName: '', lastName: '', email: '', phone: '',
@@ -24,6 +34,8 @@ export default function PatientsPage() {
   const [saving, setSaving] = useState(false);
   const [historyPatient, setHistoryPatient] = useState(null);
 
+  const { errors, submitted, validateField, validateAll, resetValidation } = useFormValidation(PATIENT_SCHEMA);
+
   const load = async () => {
     try {
       const data = await getPatients();
@@ -37,14 +49,14 @@ export default function PatientsPage() {
 
   useEffect(() => { load(); }, []);
 
-  const openNew = () => { setEditing(null); setForm(EMPTY_FORM); setModalOpen(true); };
-  const openEdit = (p) => { setEditing(p); setForm({ ...p }); setModalOpen(true); };
+  const openNew = () => { setEditing(null); setForm(EMPTY_FORM); resetValidation(); setModalOpen(true); };
+  const openEdit = (p) => { setEditing(p); setForm({ ...p }); resetValidation(); setModalOpen(true); };
   // Always reset form on close — prevents stale data appearing in the next "New Patient" modal
-  const closeModal = () => { setModalOpen(false); setEditing(null); setForm(EMPTY_FORM); };
+  const closeModal = () => { setModalOpen(false); setEditing(null); setForm(EMPTY_FORM); resetValidation(); };
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!form.firstName || !form.lastName) { toast.error('Name is required'); return; }
+    if (!validateAll(form)) return;
     setSaving(true);
     try {
       if (editing) {
@@ -203,18 +215,32 @@ export default function PatientsPage() {
               { label: 'First Name *', key: 'firstName', type: 'text' },
               { label: 'Last Name *', key: 'lastName', type: 'text' },
               { label: 'Email', key: 'email', type: 'email' },
-              { label: 'Phone', key: 'phone', type: 'tel' },
+              { label: 'Phone', key: 'phone', type: 'tel', placeholder: '01XXXXXXXXX' },
               { label: 'Date of Birth', key: 'dateOfBirth', type: 'date' },
               { label: 'Address', key: 'address', type: 'text' },
-            ].map(({ label, key, type }) => (
+            ].map(({ label, key, type, placeholder }) => (
               <div key={key}>
                 <label className="block text-xs text-slate-400 mb-1.5 uppercase tracking-wider font-medium">{label}</label>
                 <input
                   type={type}
                   value={form[key]}
-                  onChange={e => setForm({ ...form, [key]: e.target.value })}
-                  className="w-full bg-navy-800 border border-white/10 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/20 transition-all"
+                  placeholder={placeholder}
+                  onChange={e => {
+                    let val = e.target.value;
+                    // Phone: strip non-digits and cap at 11 characters
+                    if (key === 'phone') {
+                      val = val.replace(/\D/g, '').slice(0, 11);
+                      setForm({ ...form, [key]: val });
+                      validateField('phone', val);
+                    } else {
+                      setForm({ ...form, [key]: val });
+                      // Only re-validate fields with rules after first submit attempt
+                      if (submitted && PATIENT_SCHEMA[key]) validateField(key, val);
+                    }
+                  }}
+                  className={inputCls(!!(errors[key]))}
                 />
+                <FieldError message={errors[key]} />
               </div>
             ))}
           </div>

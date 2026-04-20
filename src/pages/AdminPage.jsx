@@ -6,8 +6,18 @@ import {
 import toast from 'react-hot-toast';
 import Header from '../components/layout/Header';
 import Modal from '../components/ui/Modal';
+import FieldError from '../components/ui/FieldError';
 import { getDoctors } from '../firebase/users';
 import { createDoctor, removeDoctorProfile } from '../firebase/admin';
+import { useFormValidation } from '../hooks/useFormValidation';
+import { required, email as emailRule, minLength, inputCls } from '../utils/validators';
+
+const DOCTOR_SCHEMA = {
+  name:      [required('Full name is required')],
+  email:     [required('Email is required'), emailRule()],
+  specialty: [required('Please select a specialty')],
+  password:  [required('Password is required'), minLength(6, 'Password must be at least 6 characters')],
+};
 
 const SPECIALTIES = [
   'General Practice',
@@ -57,6 +67,8 @@ export default function AdminPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [deletingId, setDeletingId]   = useState(null);
 
+  const { errors, submitted, validateField, validateAll, resetValidation } = useFormValidation(DOCTOR_SCHEMA);
+
   const load = async () => {
     setLoading(true);
     try {
@@ -70,22 +82,23 @@ export default function AdminPage() {
 
   useEffect(() => { load(); }, []);
 
-  const closeModal = () => { setModalOpen(false); setForm(EMPTY_FORM); setShowPw(false); setShowConfirm(false); };
+  const closeModal = () => { setModalOpen(false); setForm(EMPTY_FORM); setShowPw(false); setShowConfirm(false); resetValidation(); };
 
   const handleSave = async (e) => {
     e.preventDefault();
-    const { name, email, password, confirmPassword, specialty } = form;
 
-    if (!name.trim())     { toast.error('Full name is required');     return; }
-    if (!email.trim())    { toast.error('Email is required');          return; }
-    if (!specialty)       { toast.error('Please select a specialty'); return; }
-    if (!password)        { toast.error('Password is required');       return; }
-    if (password.length < 6) { toast.error('Password must be at least 6 characters'); return; }
-    if (password !== confirmPassword) { toast.error('Passwords do not match'); return; }
+    // Validate schema fields + confirmPassword cross-field check in one pass
+    const isValid = validateAll(form, {
+      confirmPassword: [
+        required('Please confirm the password'),
+        (v) => v !== form.password ? 'Passwords do not match' : null,
+      ],
+    });
+    if (!isValid) return;
 
     setSaving(true);
     try {
-      const newDoctor = await createDoctor({ name: name.trim(), email: email.trim(), password, specialty });
+      const newDoctor = await createDoctor({ name: form.name.trim(), email: form.email.trim(), password: form.password, specialty: form.specialty });
       toast.success(`Dr. ${newDoctor.name} registered successfully`);
       closeModal();
       await load();
@@ -136,7 +149,7 @@ export default function AdminPage() {
           </div>
 
           <button
-            onClick={() => setModalOpen(true)}
+            onClick={() => { resetValidation(); setModalOpen(true); }}
             className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-400 hover:to-cyan-500 text-white text-sm font-semibold rounded-xl transition-all shadow-glow-teal"
           >
             <Plus className="w-4 h-4" />
@@ -159,7 +172,7 @@ export default function AdminPage() {
               Click "Add New Doctor" to create the first doctor account.
             </p>
             <button
-              onClick={() => setModalOpen(true)}
+              onClick={() => { resetValidation(); setModalOpen(true); }}
               className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-teal-500 to-cyan-600 text-white text-sm font-semibold rounded-xl transition-all shadow-glow-teal"
             >
               <Plus className="w-4 h-4" />
@@ -273,11 +286,12 @@ export default function AdminPage() {
             <input
               type="text"
               value={form.name}
-              onChange={e => set('name', e.target.value)}
+              onChange={e => { set('name', e.target.value); if (submitted) validateField('name', e.target.value); }}
               placeholder="Dr. Jane Smith"
               autoFocus
-              className="w-full bg-navy-800 border border-white/10 text-white placeholder-slate-600 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-500/50 transition-all"
+              className={inputCls(!!errors.name)}
             />
+            <FieldError message={errors.name} />
           </div>
 
           {/* Email */}
@@ -288,10 +302,11 @@ export default function AdminPage() {
             <input
               type="email"
               value={form.email}
-              onChange={e => set('email', e.target.value)}
+              onChange={e => { set('email', e.target.value); if (submitted) validateField('email', e.target.value); }}
               placeholder="jane.smith@clinic.com"
-              className="w-full bg-navy-800 border border-white/10 text-white placeholder-slate-600 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-500/50 transition-all"
+              className={inputCls(!!errors.email)}
             />
+            <FieldError message={errors.email} />
           </div>
 
           {/* Specialty */}
@@ -301,12 +316,13 @@ export default function AdminPage() {
             </label>
             <select
               value={form.specialty}
-              onChange={e => set('specialty', e.target.value)}
-              className="w-full bg-navy-800 border border-white/10 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-500/50 transition-all"
+              onChange={e => { set('specialty', e.target.value); if (submitted) validateField('specialty', e.target.value); }}
+              className={inputCls(!!errors.specialty)}
             >
               <option value="">Select specialty…</option>
               {SPECIALTIES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
+            <FieldError message={errors.specialty} />
           </div>
 
           {/* Password */}
@@ -318,9 +334,9 @@ export default function AdminPage() {
               <input
                 type={showPw ? 'text' : 'password'}
                 value={form.password}
-                onChange={e => set('password', e.target.value)}
+                onChange={e => { set('password', e.target.value); if (submitted) validateField('password', e.target.value); }}
                 placeholder="Min. 6 characters"
-                className="w-full bg-navy-800 border border-white/10 text-white placeholder-slate-600 rounded-xl px-3 py-2.5 pr-10 text-sm focus:outline-none focus:border-teal-500/50 transition-all"
+                className={inputCls(!!errors.password, 'pr-10')}
               />
               <button
                 type="button"
@@ -330,6 +346,7 @@ export default function AdminPage() {
                 {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+            <FieldError message={errors.password} />
           </div>
 
           {/* Confirm Password */}
@@ -341,15 +358,21 @@ export default function AdminPage() {
               <input
                 type={showConfirm ? 'text' : 'password'}
                 value={form.confirmPassword}
-                onChange={e => set('confirmPassword', e.target.value)}
+                onChange={e => {
+                  const v = e.target.value;
+                  set('confirmPassword', v);
+                  // confirmPassword cross-field rule: compare against current password
+                  if (submitted) {
+                    validateAll({ ...form, confirmPassword: v }, {
+                      confirmPassword: [
+                        required('Please confirm the password'),
+                        (val) => val !== form.password ? 'Passwords do not match' : null,
+                      ],
+                    });
+                  }
+                }}
                 placeholder="Re-enter password"
-                className={`w-full bg-navy-800 border text-white placeholder-slate-600 rounded-xl px-3 py-2.5 pr-10 text-sm focus:outline-none transition-all ${
-                  form.confirmPassword && form.password !== form.confirmPassword
-                    ? 'border-red-500/50 focus:border-red-500/70'
-                    : form.confirmPassword && form.password === form.confirmPassword
-                    ? 'border-teal-500/50'
-                    : 'border-white/10 focus:border-teal-500/50'
-                }`}
+                className={inputCls(!!errors.confirmPassword, 'pr-10')}
               />
               <button
                 type="button"
@@ -359,9 +382,7 @@ export default function AdminPage() {
                 {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
-            {form.confirmPassword && form.password !== form.confirmPassword && (
-              <p className="text-xs text-red-400 mt-1.5">Passwords do not match</p>
-            )}
+            <FieldError message={errors.confirmPassword} />
           </div>
 
           {/* Actions */}

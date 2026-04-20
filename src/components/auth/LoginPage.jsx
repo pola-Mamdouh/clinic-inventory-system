@@ -4,6 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import { LogIn, Stethoscope, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { seedUserRoles } from '../../firebase/seeder';
+import { useFormValidation } from '../../hooks/useFormValidation';
+import { required, email as emailRule, minLength, inputCls } from '../../utils/validators';
+import FieldError from '../ui/FieldError';
+
+const LOGIN_SCHEMA = {
+  email:    [required('Email is required'), emailRule()],
+  password: [required('Password is required'), minLength(6, 'Password must be at least 6 characters')],
+};
 
 const DEMO_ACCOUNTS = [
   { label: 'Admin',        email: 'admin@clinic.com',        icon: '⚙️'  },
@@ -20,9 +28,11 @@ export default function LoginPage() {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const { errors, submitted, validateField, validateAll } = useFormValidation(LOGIN_SCHEMA);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email || !password) { toast.error('Please fill in all fields'); return; }
+    if (!validateAll({ email, password })) return;
     setLoading(true);
     try {
       const cred = await login(email, password);
@@ -83,10 +93,11 @@ export default function LoginPage() {
               <input
                 type="email"
                 value={email}
-                onChange={e => setEmail(e.target.value)}
+                onChange={e => { setEmail(e.target.value); if (submitted) validateField('email', e.target.value); }}
                 placeholder="user@clinic.com"
-                className="w-full bg-navy-800 border border-white/10 text-white placeholder-slate-600 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 transition-all"
+                className={inputCls(!!errors.email, 'px-4 py-3')}
               />
+              <FieldError message={errors.email} />
             </div>
 
             <div>
@@ -97,9 +108,9 @@ export default function LoginPage() {
                 <input
                   type={showPw ? 'text' : 'password'}
                   value={password}
-                  onChange={e => setPassword(e.target.value)}
+                  onChange={e => { setPassword(e.target.value); if (submitted) validateField('password', e.target.value); }}
                   placeholder="••••••••"
-                  className="w-full bg-navy-800 border border-white/10 text-white placeholder-slate-600 rounded-xl px-4 py-3 pr-11 text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 transition-all"
+                  className={inputCls(!!errors.password, 'px-4 py-3 pr-11')}
                 />
                 <button
                   type="button"
@@ -109,6 +120,7 @@ export default function LoginPage() {
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              <FieldError message={errors.password} />
             </div>
 
             <button

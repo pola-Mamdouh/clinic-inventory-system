@@ -7,8 +7,18 @@ import SearchBar from '../components/ui/SearchBar';
 import Badge from '../components/ui/Badge';
 import EmptyState from '../components/ui/EmptyState';
 import StatCard from '../components/ui/StatCard';
+import FieldError from '../components/ui/FieldError';
 import { getInventory, addInventoryItem, updateInventoryItem, deleteInventoryItem } from '../firebase/inventory';
 import { useAuth } from '../context/AuthContext';
+import { useFormValidation } from '../hooks/useFormValidation';
+import { required, numeric, minValue, inputCls } from '../utils/validators';
+
+const INVENTORY_SCHEMA = {
+  name:              [required('Item name is required')],
+  quantity:          [required('Quantity is required'), numeric(), minValue(0, 'Quantity cannot be negative')],
+  lowStockThreshold: [numeric(), minValue(0, 'Alert threshold cannot be negative')],
+  price:             [numeric(), minValue(0, 'Price cannot be negative')],
+};
 
 const CATEGORIES = ['Medicine', 'Surgical', 'Diagnostic', 'Consumable', 'Equipment', 'Other'];
 const UNITS = ['pcs', 'boxes', 'bottles', 'vials', 'packs', 'rolls', 'pairs', 'units'];
@@ -32,6 +42,8 @@ export default function InventoryPage() {
   const [sortBy, setSortBy] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
 
+  const { errors, submitted, validateField, validateAll, resetValidation } = useFormValidation(INVENTORY_SCHEMA);
+
   const load = async () => {
     try {
       const data = await getInventory();
@@ -42,14 +54,14 @@ export default function InventoryPage() {
 
   useEffect(() => { load(); }, []);
 
-  const openNew = () => { setEditing(null); setForm(EMPTY_FORM); setModalOpen(true); };
-  const openEdit = (item) => { setEditing(item); setForm({ ...item, quantity: String(item.quantity), lowStockThreshold: String(item.lowStockThreshold || 5), price: String(item.price || '') }); setModalOpen(true); };
+  const openNew = () => { setEditing(null); setForm(EMPTY_FORM); resetValidation(); setModalOpen(true); };
+  const openEdit = (item) => { setEditing(item); setForm({ ...item, quantity: String(item.quantity), lowStockThreshold: String(item.lowStockThreshold || 5), price: String(item.price || '') }); resetValidation(); setModalOpen(true); };
   // Always reset form on close — prevents stale data appearing in the next "Add Item" modal
-  const closeModal = () => { setModalOpen(false); setEditing(null); setForm(EMPTY_FORM); };
+  const closeModal = () => { setModalOpen(false); setEditing(null); setForm(EMPTY_FORM); resetValidation(); };
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!form.name) { toast.error('Name is required'); return; }
+    if (!validateAll(form)) return;
     setSaving(true);
     try {
       // Strip id and createdAt before writing — sending them back would overwrite
@@ -292,10 +304,11 @@ export default function InventoryPage() {
             <input
               type="text"
               value={form.name}
-              onChange={e => setForm({ ...form, name: e.target.value })}
+              onChange={e => { setForm({ ...form, name: e.target.value }); if (submitted) validateField('name', e.target.value); }}
               placeholder="e.g. Paracetamol 500mg"
-              className="w-full bg-navy-800 border border-white/10 text-white placeholder-slate-600 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-500/50 transition-all"
+              className={inputCls(!!errors.name)}
             />
+            <FieldError message={errors.name} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -316,15 +329,36 @@ export default function InventoryPage() {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-xs text-slate-400 mb-1.5 uppercase tracking-wider font-medium">Quantity *</label>
-              <input type="number" min="0" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} placeholder="0" className="w-full bg-navy-800 border border-white/10 text-white placeholder-slate-600 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-500/50 transition-all" />
+              <input
+                type="number" min="0"
+                value={form.quantity}
+                onChange={e => { const v = e.target.value; setForm({ ...form, quantity: v }); if (submitted) validateField('quantity', v); }}
+                placeholder="0"
+                className={inputCls(!!errors.quantity)}
+              />
+              <FieldError message={errors.quantity} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1.5 uppercase tracking-wider font-medium">Low Alert At</label>
-              <input type="number" min="0" value={form.lowStockThreshold} onChange={e => setForm({ ...form, lowStockThreshold: e.target.value })} placeholder="5" className="w-full bg-navy-800 border border-white/10 text-white placeholder-slate-600 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-500/50 transition-all" />
+              <input
+                type="number" min="0"
+                value={form.lowStockThreshold}
+                onChange={e => { const v = e.target.value; setForm({ ...form, lowStockThreshold: v }); if (submitted) validateField('lowStockThreshold', v); }}
+                placeholder="5"
+                className={inputCls(!!errors.lowStockThreshold)}
+              />
+              <FieldError message={errors.lowStockThreshold} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1.5 uppercase tracking-wider font-medium">Unit Price ($)</label>
-              <input type="number" min="0" step="0.01" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="0.00" className="w-full bg-navy-800 border border-white/10 text-white placeholder-slate-600 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-500/50 transition-all" />
+              <input
+                type="number" min="0" step="0.01"
+                value={form.price}
+                onChange={e => { const v = e.target.value; setForm({ ...form, price: v }); if (submitted) validateField('price', v); }}
+                placeholder="0.00"
+                className={inputCls(!!errors.price)}
+              />
+              <FieldError message={errors.price} />
             </div>
           </div>
 
